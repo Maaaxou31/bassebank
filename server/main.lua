@@ -3,22 +3,69 @@ ESX = exports["es_extended"]:getSharedObject()
 -- Fonctions helper sécurisées pour obtenir/modifier l'argent
 local function GetPlayerMoney(xPlayer)
     local success, result = pcall(function()
-        return xPlayer.getMoney()
+        -- Méthode 1: Essayer getMoney (ESX standard)
+        if xPlayer.getMoney then
+            return xPlayer.getMoney() or 0
+        end
+
+        -- Méthode 2: Chercher dans accounts (jaksam_inventory)
+        if xPlayer.accounts then
+            for _, account in pairs(xPlayer.accounts) do
+                if account.name == 'money' then
+                    return account.money or 0
+                end
+            end
+        end
+
+        -- Méthode 3: Accès direct au champ money
+        if xPlayer.money then
+            return xPlayer.money
+        end
+
+        return 0
     end)
-    if success then
-        return result or 0
+
+    if success and result then
+        return result
     end
+
+    print('^1[BasseBank] ^7ERREUR GetPlayerMoney: Impossible de récupérer l\'argent liquide')
     return 0
 end
 
 local function GetPlayerBank(xPlayer)
     local success, result = pcall(function()
-        local account = xPlayer.getAccount('bank')
-        return account and account.money or 0
+        -- Méthode 1: Essayer getAccount (ESX standard)
+        if xPlayer.getAccount then
+            local account = xPlayer.getAccount('bank')
+            if account and account.money then
+                return account.money
+            end
+        end
+
+        -- Méthode 2: Chercher dans accounts (jaksam_inventory)
+        if xPlayer.accounts then
+            for _, account in pairs(xPlayer.accounts) do
+                if account.name == 'bank' then
+                    return account.money or 0
+                end
+            end
+        end
+
+        return 0
     end)
-    if success then
-        return result or 0
+
+    if success and result then
+        return result
     end
+
+    -- Dernier recours: afficher une erreur détaillée
+    print('^1[BasseBank] ^7ERREUR GetPlayerBank: Impossible de récupérer le compte bancaire')
+    if xPlayer then
+        print('^1[BasseBank] ^7xPlayer existe, identifier: ' .. (xPlayer.identifier or 'unknown'))
+        print('^1[BasseBank] ^7xPlayer.accounts existe: ' .. tostring(xPlayer.accounts ~= nil))
+    end
+
     return 0
 end
 
@@ -57,10 +104,27 @@ ESX.RegisterServerCallback('bassebank:getBalances', function(source, cb)
         return
     end
 
+    print('^6[BasseBank DEBUG] ^7===== RÉCUPÉRATION DES SOLDES =====')
+    print('^6[BasseBank DEBUG] ^7Source: ' .. source)
+    print('^6[BasseBank DEBUG] ^7Identifier: ' .. xPlayer.identifier)
+
+    -- Debug de la structure xPlayer
+    print('^6[BasseBank DEBUG] ^7xPlayer.getMoney existe: ' .. tostring(xPlayer.getMoney ~= nil))
+    print('^6[BasseBank DEBUG] ^7xPlayer.getAccount existe: ' .. tostring(xPlayer.getAccount ~= nil))
+    print('^6[BasseBank DEBUG] ^7xPlayer.accounts existe: ' .. tostring(xPlayer.accounts ~= nil))
+
+    if xPlayer.accounts then
+        print('^6[BasseBank DEBUG] ^7Nombre de comptes: ' .. #xPlayer.accounts)
+        for i, acc in pairs(xPlayer.accounts) do
+            print('^6[BasseBank DEBUG] ^7  Compte[' .. i .. ']: ' .. (acc.name or 'unknown') .. ' = ' .. (acc.money or 0) .. '$')
+        end
+    end
+
     local cash = GetPlayerMoney(xPlayer)
     local bank = GetPlayerBank(xPlayer)
 
-    print('^3[BasseBank DEBUG] ^7Source: ' .. source .. ' | Cash: ' .. cash .. ' | Bank: ' .. bank)
+    print('^3[BasseBank DEBUG] ^7RÉSULTAT => Cash: ' .. cash .. '$ | Bank: ' .. bank .. '$')
+    print('^6[BasseBank DEBUG] ^7=====================================')
 
     cb({cash = cash, bank = bank})
 end)
