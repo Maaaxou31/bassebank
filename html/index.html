@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BasseBank</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="bank-container" style="display: none;">
+        <div class="bank-wrapper">
+            <!-- Header -->
+            <div class="bank-header">
+                <div class="bank-logo">
+                    <h1>🏦 BasseBank</h1>
+                </div>
+                <button class="close-btn" onclick="closeBank()">✕</button>
+            </div>
+
+            <!-- Balance Section -->
+            <div class="balance-section">
+                <div class="balance-card">
+                    <div class="balance-label">Argent Liquide</div>
+                    <div class="balance-amount cash">$<span id="cash-amount">0</span></div>
+                </div>
+                <div class="balance-card">
+                    <div class="balance-label">Compte Courant</div>
+                    <div class="balance-amount bank">$<span id="bank-amount">0</span></div>
+                </div>
+                <div class="balance-card">
+                    <div class="balance-label">Compte Épargne</div>
+                    <div class="balance-amount savings">$<span id="savings-amount">0</span></div>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="tabs">
+                <button class="tab-btn active" onclick="showTab('operations')">Opérations</button>
+                <button class="tab-btn" onclick="showTab('transfer')">Virements</button>
+                <button class="tab-btn" onclick="showTab('savings')">Épargne</button>
+                <button class="tab-btn" onclick="showTab('history')">Historique</button>
+            </div>
+
+            <!-- Tab Content -->
+            <div class="tab-content">
+                <!-- Operations Tab -->
+                <div id="operations-tab" class="tab-pane active">
+                    <div class="operation-grid">
+                        <div class="operation-card">
+                            <h3>💵 Déposer</h3>
+                            <input type="number" id="deposit-amount" placeholder="Montant" min="0">
+                            <button class="btn btn-success" onclick="deposit()">Déposer</button>
+                        </div>
+                        <div class="operation-card">
+                            <h3>💸 Retirer</h3>
+                            <input type="number" id="withdraw-amount" placeholder="Montant" min="0">
+                            <button class="btn btn-danger" onclick="withdraw()">Retirer</button>
+                            <div id="atm-warning" class="atm-warning" style="display: none;">
+                                ⚠️ Limite ATM: $50,000
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Transfer Tab -->
+                <div id="transfer-tab" class="tab-pane">
+                    <div class="transfer-container">
+                        <h3>💳 Effectuer un virement</h3>
+                        <select id="transfer-player" class="input-field">
+                            <option value="">Sélectionnez un joueur</option>
+                        </select>
+                        <input type="number" id="transfer-amount" class="input-field" placeholder="Montant" min="0">
+                        <div class="transfer-info">
+                            ℹ️ Frais de virement: 2%
+                        </div>
+                        <button class="btn btn-primary" onclick="transfer()">Envoyer</button>
+                    </div>
+                </div>
+
+                <!-- Savings Tab -->
+                <div id="savings-tab" class="tab-pane">
+                    <div class="savings-container">
+                        <div class="savings-info">
+                            <p>📈 Taux d'intérêt: 5% par heure</p>
+                            <p>💰 Dépôt minimum: $1,000</p>
+                        </div>
+                        <div class="operation-grid">
+                            <div class="operation-card">
+                                <h3>Déposer sur Épargne</h3>
+                                <input type="number" id="savings-deposit-amount" placeholder="Montant" min="1000">
+                                <button class="btn btn-success" onclick="savingsDeposit()">Déposer</button>
+                            </div>
+                            <div class="operation-card">
+                                <h3>Retirer de l'Épargne</h3>
+                                <input type="number" id="savings-withdraw-amount" placeholder="Montant" min="0">
+                                <button class="btn btn-danger" onclick="savingsWithdraw()">Retirer</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- History Tab -->
+                <div id="history-tab" class="tab-pane">
+                    <div class="history-container">
+                        <h3>📜 Historique des transactions</h3>
+                        <div id="transactions-list" class="transactions-list">
+                            <!-- Transactions will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
