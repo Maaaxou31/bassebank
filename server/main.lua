@@ -1,130 +1,147 @@
 ESX = exports["es_extended"]:getSharedObject()
 
--- Fonctions helper sécurisées pour obtenir/modifier l'argent
+print('^2[BasseBank] ^7==============================================')
+print('^2[BasseBank] ^7Démarrage du système bancaire...')
+print('^2[BasseBank] ^7==============================================')
+
+-- Fonctions ultra-simples qui utilisent directement ESX
 local function GetPlayerMoney(xPlayer)
-    local success, result = pcall(function()
-        -- Méthode 1: Essayer getMoney (ESX standard)
-        if xPlayer.getMoney then
-            return xPlayer.getMoney() or 0
-        end
+    if not xPlayer then return 0 end
 
-        -- Méthode 2: Chercher dans accounts (jaksam_inventory)
-        if xPlayer.accounts then
-            for _, account in pairs(xPlayer.accounts) do
-                if account.name == 'money' then
-                    return account.money or 0
-                end
-            end
-        end
-
-        -- Méthode 3: Accès direct au champ money
-        if xPlayer.money then
-            return xPlayer.money
-        end
-
-        return 0
+    -- Essayer getMoney (standard)
+    local success, money = pcall(function()
+        return xPlayer.getMoney()
     end)
 
-    if success and result then
-        return result
+    if success and money then
+        print('^2[BasseBank] ^7GetPlayerMoney via getMoney(): ' .. money .. '$')
+        return money
     end
 
-    print('^1[BasseBank] ^7ERREUR GetPlayerMoney: Impossible de récupérer l\'argent liquide')
+    -- Essayer via money direct
+    if xPlayer.money then
+        print('^2[BasseBank] ^7GetPlayerMoney via money: ' .. xPlayer.money .. '$')
+        return xPlayer.money
+    end
+
+    print('^1[BasseBank] ^7GetPlayerMoney ÉCHEC - retour 0$')
     return 0
 end
 
 local function GetPlayerBank(xPlayer)
-    local success, result = pcall(function()
-        -- Méthode 1: Essayer getAccount (ESX standard)
-        if xPlayer.getAccount then
-            local account = xPlayer.getAccount('bank')
-            if account and account.money then
-                return account.money
-            end
-        end
+    if not xPlayer then return 0 end
 
-        -- Méthode 2: Chercher dans accounts (jaksam_inventory)
-        if xPlayer.accounts then
-            for _, account in pairs(xPlayer.accounts) do
-                if account.name == 'bank' then
-                    return account.money or 0
-                end
-            end
-        end
-
-        return 0
+    -- Essayer getAccount (standard)
+    local success, account = pcall(function()
+        return xPlayer.getAccount('bank')
     end)
 
-    if success and result then
-        return result
+    if success and account and account.money then
+        print('^2[BasseBank] ^7GetPlayerBank via getAccount(): ' .. account.money .. '$')
+        return account.money
     end
 
-    -- Dernier recours: afficher une erreur détaillée
-    print('^1[BasseBank] ^7ERREUR GetPlayerBank: Impossible de récupérer le compte bancaire')
-    if xPlayer then
-        print('^1[BasseBank] ^7xPlayer existe, identifier: ' .. (xPlayer.identifier or 'unknown'))
-        print('^1[BasseBank] ^7xPlayer.accounts existe: ' .. tostring(xPlayer.accounts ~= nil))
+    -- Essayer directement dans accounts
+    if xPlayer.accounts then
+        for k, v in pairs(xPlayer.accounts) do
+            if v.name == 'bank' then
+                print('^2[BasseBank] ^7GetPlayerBank via accounts: ' .. v.money .. '$')
+                return v.money
+            end
+        end
     end
 
+    print('^1[BasseBank] ^7GetPlayerBank ÉCHEC - retour 0$')
     return 0
 end
 
 local function AddPlayerMoney(xPlayer, amount)
-    pcall(function()
+    if not xPlayer or amount <= 0 then return false end
+
+    local success = pcall(function()
         xPlayer.addMoney(amount)
     end)
+
+    if success then
+        print('^2[BasseBank] ^7AddPlayerMoney: +' .. amount .. '$ ajouté')
+        return true
+    end
+
+    print('^1[BasseBank] ^7AddPlayerMoney ÉCHEC')
+    return false
 end
 
 local function RemovePlayerMoney(xPlayer, amount)
-    pcall(function()
+    if not xPlayer or amount <= 0 then return false end
+
+    local success = pcall(function()
         xPlayer.removeMoney(amount)
     end)
+
+    if success then
+        print('^2[BasseBank] ^7RemovePlayerMoney: -' .. amount .. '$ retiré')
+        return true
+    end
+
+    print('^1[BasseBank] ^7RemovePlayerMoney ÉCHEC')
+    return false
 end
 
 local function AddPlayerBank(xPlayer, amount)
-    pcall(function()
+    if not xPlayer or amount <= 0 then return false end
+
+    local success = pcall(function()
         xPlayer.addAccountMoney('bank', amount)
     end)
+
+    if success then
+        print('^2[BasseBank] ^7AddPlayerBank: +' .. amount .. '$ ajouté')
+        return true
+    end
+
+    print('^1[BasseBank] ^7AddPlayerBank ÉCHEC')
+    return false
 end
 
 local function RemovePlayerBank(xPlayer, amount)
-    pcall(function()
+    if not xPlayer or amount <= 0 then return false end
+
+    local success = pcall(function()
         xPlayer.removeAccountMoney('bank', amount)
     end)
+
+    if success then
+        print('^2[BasseBank] ^7RemovePlayerBank: -' .. amount .. '$ retiré')
+        return true
+    end
+
+    print('^1[BasseBank] ^7RemovePlayerBank ÉCHEC')
+    return false
 end
 
 print('^2[BasseBank] ^7Système de gestion d\'argent initialisé')
+print('^2[BasseBank] ^7==============================================')
 
 -- Callback pour obtenir les soldes
 ESX.RegisterServerCallback('bassebank:getBalances', function(source, cb)
+    print('^6[BasseBank] ^7==================== GET BALANCES ====================')
+
     local xPlayer = ESX.GetPlayerFromId(source)
     if not xPlayer then
-        print('^1[BasseBank] ^7Erreur: xPlayer non trouvé pour source ' .. source)
+        print('^1[BasseBank] ^7ERREUR: xPlayer non trouvé pour source ' .. source)
         cb({cash = 0, bank = 0})
         return
     end
 
-    print('^6[BasseBank DEBUG] ^7===== RÉCUPÉRATION DES SOLDES =====')
-    print('^6[BasseBank DEBUG] ^7Source: ' .. source)
-    print('^6[BasseBank DEBUG] ^7Identifier: ' .. xPlayer.identifier)
-
-    -- Debug de la structure xPlayer
-    print('^6[BasseBank DEBUG] ^7xPlayer.getMoney existe: ' .. tostring(xPlayer.getMoney ~= nil))
-    print('^6[BasseBank DEBUG] ^7xPlayer.getAccount existe: ' .. tostring(xPlayer.getAccount ~= nil))
-    print('^6[BasseBank DEBUG] ^7xPlayer.accounts existe: ' .. tostring(xPlayer.accounts ~= nil))
-
-    if xPlayer.accounts then
-        print('^6[BasseBank DEBUG] ^7Nombre de comptes: ' .. #xPlayer.accounts)
-        for i, acc in pairs(xPlayer.accounts) do
-            print('^6[BasseBank DEBUG] ^7  Compte[' .. i .. ']: ' .. (acc.name or 'unknown') .. ' = ' .. (acc.money or 0) .. '$')
-        end
-    end
+    print('^6[BasseBank] ^7Joueur: ' .. xPlayer.getName() .. ' (ID: ' .. source .. ')')
+    print('^6[BasseBank] ^7Identifier: ' .. xPlayer.identifier)
 
     local cash = GetPlayerMoney(xPlayer)
     local bank = GetPlayerBank(xPlayer)
 
-    print('^3[BasseBank DEBUG] ^7RÉSULTAT => Cash: ' .. cash .. '$ | Bank: ' .. bank .. '$')
-    print('^6[BasseBank DEBUG] ^7=====================================')
+    print('^3[BasseBank] ^7==========================================')
+    print('^3[BasseBank] ^7RÉSULTAT FINAL => Cash: ' .. cash .. '$ | Bank: ' .. bank .. '$')
+    print('^3[BasseBank] ^7==========================================')
 
     cb({cash = cash, bank = bank})
 end)
@@ -168,35 +185,61 @@ AddEventHandler('bassebank:deposit', function(amount)
     local _source = source
     local xPlayer = ESX.GetPlayerFromId(_source)
 
+    print('^5[BasseBank] ^7========== DÉPÔT ==========')
+    print('^5[BasseBank] ^7Joueur ' .. _source .. ' veut déposer ' .. amount .. '$')
+
     if not xPlayer then
-        print('^1[BasseBank] ^7Dépôt: xPlayer non trouvé pour source ' .. _source)
+        print('^1[BasseBank] ^7ERREUR: xPlayer non trouvé')
+        TriggerClientEvent('bassebank:notify', _source, 'error', 'Erreur système')
         return
     end
 
-    if amount <= 0 then
+    if not amount or amount <= 0 then
+        print('^1[BasseBank] ^7ERREUR: Montant invalide')
         TriggerClientEvent('bassebank:notify', _source, 'error', 'Montant invalide')
         return
     end
 
     local playerMoney = GetPlayerMoney(xPlayer)
-    print('^3[BasseBank DEBUG] ^7Dépôt: Joueur a ' .. playerMoney .. '$ cash, essaie de déposer ' .. amount .. '$')
+    print('^5[BasseBank] ^7Le joueur a ' .. playerMoney .. '$ en cash')
 
     if amount > playerMoney then
-        TriggerClientEvent('bassebank:notify', _source, 'error', 'Vous n\'avez pas assez d\'argent liquide')
+        print('^1[BasseBank] ^7ERREUR: Pas assez d\'argent')
+        TriggerClientEvent('bassebank:notify', _source, 'error', 'Vous n\'avez pas assez d\'argent liquide (' .. playerMoney .. '$)')
         return
     end
 
     local fee = math.floor(amount * Config.DepositFee)
     local finalAmount = amount - fee
 
-    RemovePlayerMoney(xPlayer, amount)
-    AddPlayerBank(xPlayer, finalAmount)
+    print('^5[BasseBank] ^7Retrait de ' .. amount .. '$ cash...')
+    local removed = RemovePlayerMoney(xPlayer, amount)
 
-    print('^2[BasseBank] ^7Dépôt réussi: ' .. finalAmount .. '$ déposé')
+    if not removed then
+        print('^1[BasseBank] ^7ERREUR: Impossible de retirer l\'argent cash')
+        TriggerClientEvent('bassebank:notify', _source, 'error', 'Erreur lors du retrait de l\'argent')
+        return
+    end
+
+    print('^5[BasseBank] ^7Ajout de ' .. finalAmount .. '$ à la banque...')
+    local added = AddPlayerBank(xPlayer, finalAmount)
+
+    if not added then
+        print('^1[BasseBank] ^7ERREUR: Impossible d\'ajouter à la banque, remboursement...')
+        AddPlayerMoney(xPlayer, amount) -- Rembourser
+        TriggerClientEvent('bassebank:notify', _source, 'error', 'Erreur lors du dépôt')
+        return
+    end
 
     LogTransaction(xPlayer.identifier, 'depot', finalAmount, nil, nil, 'Dépôt en banque')
 
+    print('^2[BasseBank] ^7✓ DÉPÔT RÉUSSI: ' .. finalAmount .. '$ déposé')
+    print('^5[BasseBank] ^7===========================')
+
     TriggerClientEvent('bassebank:notify', _source, 'success', 'Vous avez déposé $' .. finalAmount)
+
+    -- Attendre un peu avant de mettre à jour pour être sûr que ESX a bien mis à jour
+    Wait(100)
     TriggerClientEvent('bassebank:updateBalance', _source)
 end)
 
@@ -206,34 +249,66 @@ AddEventHandler('bassebank:withdraw', function(amount, isATM)
     local _source = source
     local xPlayer = ESX.GetPlayerFromId(_source)
 
-    if not xPlayer then return end
+    print('^5[BasseBank] ^7========== RETRAIT ==========')
+    print('^5[BasseBank] ^7Joueur ' .. _source .. ' veut retirer ' .. amount .. '$')
 
-    if amount <= 0 then
+    if not xPlayer then
+        print('^1[BasseBank] ^7ERREUR: xPlayer non trouvé')
+        TriggerClientEvent('bassebank:notify', _source, 'error', 'Erreur système')
+        return
+    end
+
+    if not amount or amount <= 0 then
+        print('^1[BasseBank] ^7ERREUR: Montant invalide')
         TriggerClientEvent('bassebank:notify', _source, 'error', 'Montant invalide')
         return
     end
 
     if isATM and amount > Config.ATMWithdrawLimit then
-        TriggerClientEvent('bassebank:notify', _source, 'error', 'Limite de retrait ATM dépassée ($' .. Config.ATMWithdrawLimit .. ')')
+        print('^1[BasseBank] ^7ERREUR: Limite ATM dépassée')
+        TriggerClientEvent('bassebank:notify', _source, 'error', 'Limite de retrait ATM: $' .. Config.ATMWithdrawLimit)
         return
     end
 
     local playerBank = GetPlayerBank(xPlayer)
+    print('^5[BasseBank] ^7Le joueur a ' .. playerBank .. '$ en banque')
 
     if amount > playerBank then
-        TriggerClientEvent('bassebank:notify', _source, 'error', 'Fonds insuffisants')
+        print('^1[BasseBank] ^7ERREUR: Pas assez d\'argent en banque')
+        TriggerClientEvent('bassebank:notify', _source, 'error', 'Fonds insuffisants (' .. playerBank .. '$)')
         return
     end
 
     local fee = math.floor(amount * Config.WithdrawFee)
     local finalAmount = amount - fee
 
-    RemovePlayerBank(xPlayer, amount)
-    AddPlayerMoney(xPlayer, finalAmount)
+    print('^5[BasseBank] ^7Retrait de ' .. amount .. '$ de la banque...')
+    local removed = RemovePlayerBank(xPlayer, amount)
+
+    if not removed then
+        print('^1[BasseBank] ^7ERREUR: Impossible de retirer de la banque')
+        TriggerClientEvent('bassebank:notify', _source, 'error', 'Erreur lors du retrait')
+        return
+    end
+
+    print('^5[BasseBank] ^7Ajout de ' .. finalAmount .. '$ en cash...')
+    local added = AddPlayerMoney(xPlayer, finalAmount)
+
+    if not added then
+        print('^1[BasseBank] ^7ERREUR: Impossible d\'ajouter le cash, remboursement...')
+        AddPlayerBank(xPlayer, amount) -- Rembourser
+        TriggerClientEvent('bassebank:notify', _source, 'error', 'Erreur lors de l\'ajout de l\'argent')
+        return
+    end
 
     LogTransaction(xPlayer.identifier, 'retrait', amount, nil, nil, isATM and 'Retrait ATM' or 'Retrait en banque')
 
+    print('^2[BasseBank] ^7✓ RETRAIT RÉUSSI: ' .. finalAmount .. '$ retiré')
+    print('^5[BasseBank] ^7===========================')
+
     TriggerClientEvent('bassebank:notify', _source, 'success', 'Vous avez retiré $' .. finalAmount)
+
+    Wait(100)
     TriggerClientEvent('bassebank:updateBalance', _source)
 end)
 
