@@ -2,7 +2,7 @@ ESX = exports["es_extended"]:getSharedObject()
 
 -- Fonction pour enregistrer une transaction
 local function LogTransaction(identifier, type, amount, fromIdentifier, toIdentifier, description)
-    MySQL.insert('INSERT INTO bank_transactions (identifier, type, amount, from_identifier, to_identifier, description) VALUES (?, ?, ?, ?, ?, ?)', {
+    MySQL.insert('INSERT INTO bassebank_transactions (identifier, type, amount, from_identifier, to_identifier, description) VALUES (?, ?, ?, ?, ?, ?)', {
         identifier, type, amount, fromIdentifier, toIdentifier, description
     })
 end
@@ -11,7 +11,7 @@ end
 ESX.RegisterServerCallback('bassebank:getTransactions', function(source, cb)
     local xPlayer = ESX.GetPlayerFromId(source)
 
-    MySQL.query('SELECT * FROM bank_transactions WHERE identifier = ? OR from_identifier = ? OR to_identifier = ? ORDER BY date DESC LIMIT 50', {
+    MySQL.query('SELECT * FROM bassebank_transactions WHERE identifier = ? OR from_identifier = ? OR to_identifier = ? ORDER BY date DESC LIMIT 50', {
         xPlayer.identifier, xPlayer.identifier, xPlayer.identifier
     }, function(result)
         cb(result)
@@ -22,7 +22,7 @@ end)
 ESX.RegisterServerCallback('bassebank:getSavings', function(source, cb)
     local xPlayer = ESX.GetPlayerFromId(source)
 
-    MySQL.query('SELECT * FROM bank_savings WHERE identifier = ?', {
+    MySQL.query('SELECT * FROM bassebank_savings WHERE identifier = ?', {
         xPlayer.identifier
     }, function(result)
         if result[1] then
@@ -154,15 +154,15 @@ AddEventHandler('bassebank:savingsDeposit', function(amount)
 
     xPlayer.removeAccountMoney('bank', amount)
 
-    MySQL.query('SELECT * FROM bank_savings WHERE identifier = ?', {
+    MySQL.query('SELECT * FROM bassebank_savings WHERE identifier = ?', {
         xPlayer.identifier
     }, function(result)
         if result[1] then
-            MySQL.update('UPDATE bank_savings SET amount = amount + ? WHERE identifier = ?', {
+            MySQL.update('UPDATE bassebank_savings SET amount = amount + ? WHERE identifier = ?', {
                 amount, xPlayer.identifier
             })
         else
-            MySQL.insert('INSERT INTO bank_savings (identifier, amount) VALUES (?, ?)', {
+            MySQL.insert('INSERT INTO bassebank_savings (identifier, amount) VALUES (?, ?)', {
                 xPlayer.identifier, amount
             })
         end
@@ -179,7 +179,7 @@ AddEventHandler('bassebank:savingsWithdraw', function(amount)
     local _source = source
     local xPlayer = ESX.GetPlayerFromId(_source)
 
-    MySQL.query('SELECT * FROM bank_savings WHERE identifier = ?', {
+    MySQL.query('SELECT * FROM bassebank_savings WHERE identifier = ?', {
         xPlayer.identifier
     }, function(result)
         if not result[1] or result[1].amount < amount then
@@ -187,7 +187,7 @@ AddEventHandler('bassebank:savingsWithdraw', function(amount)
             return
         end
 
-        MySQL.update('UPDATE bank_savings SET amount = amount - ? WHERE identifier = ?', {
+        MySQL.update('UPDATE bassebank_savings SET amount = amount - ? WHERE identifier = ?', {
             amount, xPlayer.identifier
         })
 
@@ -204,12 +204,12 @@ CreateThread(function()
     while true do
         Wait(Config.SavingsInterestInterval)
 
-        MySQL.query('SELECT * FROM bank_savings WHERE amount > 0', {}, function(results)
+        MySQL.query('SELECT * FROM bassebank_savings WHERE amount > 0', {}, function(results)
             for _, account in ipairs(results) do
                 local interest = math.floor(account.amount * Config.SavingsInterestRate)
 
                 if interest > 0 then
-                    MySQL.update('UPDATE bank_savings SET amount = amount + ?, last_interest = NOW() WHERE identifier = ?', {
+                    MySQL.update('UPDATE bassebank_savings SET amount = amount + ?, last_interest = NOW() WHERE identifier = ?', {
                         interest, account.identifier
                     })
 

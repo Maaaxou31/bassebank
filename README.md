@@ -27,7 +27,17 @@ Un système bancaire complet et moderne pour FiveM avec intégration ESX.
 Téléchargez le script et placez-le dans votre dossier `resources`.
 
 ### 2. Base de données
-Exécutez le fichier `bassebank.sql` dans votre base de données MySQL pour créer les tables nécessaires :
+
+**⚠️ IMPORTANT:** Si vous avez déjà un autre système bancaire installé, utilisez `clean_install.sql` pour éviter les conflits.
+
+**Option A - Installation propre (recommandée) :**
+Exécutez le fichier `clean_install.sql` dans votre base de données MySQL. Ce fichier supprime les anciennes tables BasseBank si elles existent et crée les nouvelles avec le préfixe `bassebank_` :
+```sql
+-- Dans phpMyAdmin ou MySQL, importez le fichier clean_install.sql
+```
+
+**Option B - Installation simple (si pas d'autres scripts bancaires) :**
+Exécutez le fichier `bassebank.sql` :
 ```sql
 -- Importez le fichier bassebank.sql
 ```

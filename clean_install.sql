@@ -1,6 +1,15 @@
--- BasseBank - Tables SQL
--- Tables renommées avec préfixe "bassebank_" pour éviter les conflits
+-- BasseBank - Installation propre
+-- Ce fichier supprime les anciennes tables si elles existent et crée les nouvelles
 
+-- Supprimer les anciennes tables si elles existent (seulement celles créées par bassebank)
+-- ATTENTION: Cela supprimera toutes les données des anciennes tables!
+-- Si vous avez des données importantes, faites une sauvegarde avant!
+
+DROP TABLE IF EXISTS `bassebank_transactions`;
+DROP TABLE IF EXISTS `bassebank_savings`;
+DROP TABLE IF EXISTS `bassebank_cards`;
+
+-- Créer les nouvelles tables
 -- Table pour les transactions bancaires
 CREATE TABLE IF NOT EXISTS `bassebank_transactions` (
     `id` INT(11) NOT NULL AUTO_INCREMENT,
