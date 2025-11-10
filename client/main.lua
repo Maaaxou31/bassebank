@@ -13,13 +13,15 @@ end)
 -- Fonction pour mettre à jour le solde
 RegisterNetEvent('bassebank:updateBalance')
 AddEventHandler('bassebank:updateBalance', function()
-    ESX.PlayerData = ESX.GetPlayerData()
     if isUIOpen then
-        SendNUIMessage({
-            action = 'updateBalance',
-            bank = ESX.PlayerData.accounts[2].money,
-            cash = ESX.PlayerData.money
-        })
+        -- Demander au serveur les soldes à jour
+        ESX.TriggerServerCallback('bassebank:getBalances', function(balances)
+            SendNUIMessage({
+                action = 'updateBalance',
+                bank = balances.bank,
+                cash = balances.cash
+            })
+        end)
     end
 end)
 
@@ -111,23 +113,23 @@ end)
 function OpenBankUI(isATM)
     if isUIOpen then return end
 
-    ESX.PlayerData = ESX.GetPlayerData()
+    ESX.TriggerServerCallback('bassebank:getBalances', function(balances)
+        ESX.TriggerServerCallback('bassebank:getTransactions', function(transactions)
+            ESX.TriggerServerCallback('bassebank:getSavings', function(savings)
+                ESX.TriggerServerCallback('bassebank:getPlayers', function(players)
+                    SetNuiFocus(true, true)
+                    isUIOpen = true
 
-    ESX.TriggerServerCallback('bassebank:getTransactions', function(transactions)
-        ESX.TriggerServerCallback('bassebank:getSavings', function(savings)
-            ESX.TriggerServerCallback('bassebank:getPlayers', function(players)
-                SetNuiFocus(true, true)
-                isUIOpen = true
-
-                SendNUIMessage({
-                    action = 'openBank',
-                    isATM = isATM,
-                    bank = ESX.PlayerData.accounts[2].money,
-                    cash = ESX.PlayerData.money,
-                    savings = savings,
-                    transactions = transactions,
-                    players = players
-                })
+                    SendNUIMessage({
+                        action = 'openBank',
+                        isATM = isATM,
+                        bank = balances.bank,
+                        cash = balances.cash,
+                        savings = savings,
+                        transactions = transactions,
+                        players = players
+                    })
+                end)
             end)
         end)
     end)
@@ -135,9 +137,45 @@ end
 
 -- Fermeture de l'interface
 RegisterNUICallback('closeBank', function(data, cb)
+    cb('ok')
     SetNuiFocus(false, false)
     isUIOpen = false
-    cb('ok')
+
+    -- Force la réactivation des contrôles
+    SetTimeout(100, function()
+        SetNuiFocus(false, false)
+        SetNuiFocusKeepInput(false)
+        DisplayRadar(true)
+    end)
+end)
+
+-- Fermer avec ESC
+CreateThread(function()
+    while true do
+        Wait(0)
+        if isUIOpen then
+            -- Désactiver les contrôles pendant que l'UI est ouverte
+            DisableControlAction(0, 1, true) -- Disable mouse look
+            DisableControlAction(0, 2, true) -- Disable mouse look
+            DisableControlAction(0, 24, true) -- Attack
+            DisableControlAction(0, 25, true) -- Aim
+            DisableControlAction(0, 142, true) -- MeleeAttackAlternate
+            DisableControlAction(0, 106, true) -- VehicleMouseControlOverride
+
+            -- Vérifier si ESC est pressé
+            if IsControlJustReleased(0, 322) or IsControlJustReleased(0, 177) then -- ESC ou BACKSPACE
+                SendNUIMessage({
+                    action = 'forceClose'
+                })
+                SetNuiFocus(false, false)
+                isUIOpen = false
+                SetNuiFocusKeepInput(false)
+                DisplayRadar(true)
+            end
+        else
+            Wait(500)
+        end
+    end
 end)
 
 -- Dépôt

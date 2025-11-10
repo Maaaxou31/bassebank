@@ -16,6 +16,9 @@ window.addEventListener('message', function(event) {
         case 'updateBalance':
             updateBalance(data.cash, data.bank);
             break;
+        case 'forceClose':
+            document.getElementById('bank-container').style.display = 'none';
+            break;
     }
 });
 

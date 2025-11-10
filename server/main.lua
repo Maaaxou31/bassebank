@@ -1,5 +1,77 @@
 ESX = exports["es_extended"]:getSharedObject()
 
+-- Détection de l'inventaire utilisé
+local UseJaksamInventory = GetResourceState('jaksam_inventory') == 'started'
+
+-- Fonctions helper pour la compatibilité avec jaksam_inventory
+local function GetPlayerMoney(xPlayer)
+    if UseJaksamInventory then
+        return exports['jaksam_inventory']:GetMoney(xPlayer.source, 'money') or 0
+    else
+        return xPlayer.getMoney()
+    end
+end
+
+local function GetPlayerBank(xPlayer)
+    if UseJaksamInventory then
+        return exports['jaksam_inventory']:GetMoney(xPlayer.source, 'bank') or 0
+    else
+        return xPlayer.getAccount('bank').money
+    end
+end
+
+local function AddPlayerMoney(xPlayer, amount)
+    if UseJaksamInventory then
+        exports['jaksam_inventory']:AddMoney(xPlayer.source, 'money', amount)
+    else
+        xPlayer.addMoney(amount)
+    end
+end
+
+local function RemovePlayerMoney(xPlayer, amount)
+    if UseJaksamInventory then
+        exports['jaksam_inventory']:RemoveMoney(xPlayer.source, 'money', amount)
+    else
+        xPlayer.removeMoney(amount)
+    end
+end
+
+local function AddPlayerBank(xPlayer, amount)
+    if UseJaksamInventory then
+        exports['jaksam_inventory']:AddMoney(xPlayer.source, 'bank', amount)
+    else
+        xPlayer.addAccountMoney('bank', amount)
+    end
+end
+
+local function RemovePlayerBank(xPlayer, amount)
+    if UseJaksamInventory then
+        exports['jaksam_inventory']:RemoveMoney(xPlayer.source, 'bank', amount)
+    else
+        xPlayer.removeAccountMoney('bank', amount)
+    end
+end
+
+if UseJaksamInventory then
+    print('^2[BasseBank] ^7Détection: jaksam_inventory utilisé')
+else
+    print('^2[BasseBank] ^7Détection: ESX standard utilisé')
+end
+
+-- Callback pour obtenir les soldes
+ESX.RegisterServerCallback('bassebank:getBalances', function(source, cb)
+    local xPlayer = ESX.GetPlayerFromId(source)
+    if not xPlayer then
+        cb({cash = 0, bank = 0})
+        return
+    end
+
+    local cash = GetPlayerMoney(xPlayer)
+    local bank = GetPlayerBank(xPlayer)
+
+    cb({cash = cash, bank = bank})
+end)
+
 -- Fonction pour enregistrer une transaction
 local function LogTransaction(identifier, type, amount, fromIdentifier, toIdentifier, description)
     MySQL.insert('INSERT INTO bassebank_transactions (identifier, type, amount, from_identifier, to_identifier, description) VALUES (?, ?, ?, ?, ?, ?)', {
@@ -39,12 +111,16 @@ AddEventHandler('bassebank:deposit', function(amount)
     local _source = source
     local xPlayer = ESX.GetPlayerFromId(_source)
 
+    if not xPlayer then return end
+
     if amount <= 0 then
         TriggerClientEvent('bassebank:notify', _source, 'error', 'Montant invalide')
         return
     end
 
-    if amount > xPlayer.getMoney() then
+    local playerMoney = GetPlayerMoney(xPlayer)
+
+    if amount > playerMoney then
         TriggerClientEvent('bassebank:notify', _source, 'error', 'Vous n\'avez pas assez d\'argent liquide')
         return
     end
@@ -52,8 +128,8 @@ AddEventHandler('bassebank:deposit', function(amount)
     local fee = math.floor(amount * Config.DepositFee)
     local finalAmount = amount - fee
 
-    xPlayer.removeMoney(amount)
-    xPlayer.addAccountMoney('bank', finalAmount)
+    RemovePlayerMoney(xPlayer, amount)
+    AddPlayerBank(xPlayer, finalAmount)
 
     LogTransaction(xPlayer.identifier, 'depot', finalAmount, nil, nil, 'Dépôt en banque')
 
@@ -67,6 +143,8 @@ AddEventHandler('bassebank:withdraw', function(amount, isATM)
     local _source = source
     local xPlayer = ESX.GetPlayerFromId(_source)
 
+    if not xPlayer then return end
+
     if amount <= 0 then
         TriggerClientEvent('bassebank:notify', _source, 'error', 'Montant invalide')
         return
@@ -77,7 +155,9 @@ AddEventHandler('bassebank:withdraw', function(amount, isATM)
         return
     end
 
-    if amount > xPlayer.getAccount('bank').money then
+    local playerBank = GetPlayerBank(xPlayer)
+
+    if amount > playerBank then
         TriggerClientEvent('bassebank:notify', _source, 'error', 'Fonds insuffisants')
         return
     end
@@ -85,8 +165,8 @@ AddEventHandler('bassebank:withdraw', function(amount, isATM)
     local fee = math.floor(amount * Config.WithdrawFee)
     local finalAmount = amount - fee
 
-    xPlayer.removeAccountMoney('bank', amount)
-    xPlayer.addMoney(finalAmount)
+    RemovePlayerBank(xPlayer, amount)
+    AddPlayerMoney(xPlayer, finalAmount)
 
     LogTransaction(xPlayer.identifier, 'retrait', amount, nil, nil, isATM and 'Retrait ATM' or 'Retrait en banque')
 
@@ -100,6 +180,8 @@ AddEventHandler('bassebank:transfer', function(target, amount)
     local _source = source
     local xPlayer = ESX.GetPlayerFromId(_source)
     local xTarget = ESX.GetPlayerFromId(target)
+
+    if not xPlayer then return end
 
     if not xTarget then
         TriggerClientEvent('bassebank:notify', _source, 'error', 'Joueur introuvable')
@@ -118,14 +200,15 @@ AddEventHandler('bassebank:transfer', function(target, amount)
 
     local fee = math.floor(amount * Config.TransferFee)
     local totalAmount = amount + fee
+    local playerBank = GetPlayerBank(xPlayer)
 
-    if totalAmount > xPlayer.getAccount('bank').money then
+    if totalAmount > playerBank then
         TriggerClientEvent('bassebank:notify', _source, 'error', 'Fonds insuffisants (montant + frais: $' .. totalAmount .. ')')
         return
     end
 
-    xPlayer.removeAccountMoney('bank', totalAmount)
-    xTarget.addAccountMoney('bank', amount)
+    RemovePlayerBank(xPlayer, totalAmount)
+    AddPlayerBank(xTarget, amount)
 
     LogTransaction(xPlayer.identifier, 'virement', amount, xPlayer.identifier, xTarget.identifier, 'Virement à ' .. xTarget.getName())
     LogTransaction(xTarget.identifier, 'virement_recu', amount, xPlayer.identifier, xTarget.identifier, 'Virement de ' .. xPlayer.getName())
@@ -142,17 +225,21 @@ AddEventHandler('bassebank:savingsDeposit', function(amount)
     local _source = source
     local xPlayer = ESX.GetPlayerFromId(_source)
 
+    if not xPlayer then return end
+
     if amount < Config.MinSavingsDeposit then
         TriggerClientEvent('bassebank:notify', _source, 'error', 'Montant minimum: $' .. Config.MinSavingsDeposit)
         return
     end
 
-    if amount > xPlayer.getAccount('bank').money then
+    local playerBank = GetPlayerBank(xPlayer)
+
+    if amount > playerBank then
         TriggerClientEvent('bassebank:notify', _source, 'error', 'Fonds insuffisants')
         return
     end
 
-    xPlayer.removeAccountMoney('bank', amount)
+    RemovePlayerBank(xPlayer, amount)
 
     MySQL.query('SELECT * FROM bassebank_savings WHERE identifier = ?', {
         xPlayer.identifier
@@ -179,6 +266,8 @@ AddEventHandler('bassebank:savingsWithdraw', function(amount)
     local _source = source
     local xPlayer = ESX.GetPlayerFromId(_source)
 
+    if not xPlayer then return end
+
     MySQL.query('SELECT * FROM bassebank_savings WHERE identifier = ?', {
         xPlayer.identifier
     }, function(result)
@@ -191,7 +280,7 @@ AddEventHandler('bassebank:savingsWithdraw', function(amount)
             amount, xPlayer.identifier
         })
 
-        xPlayer.addAccountMoney('bank', amount)
+        AddPlayerBank(xPlayer, amount)
 
         LogTransaction(xPlayer.identifier, 'epargne_retrait', amount, nil, nil, 'Retrait du compte d\'épargne')
         TriggerClientEvent('bassebank:notify', _source, 'success', 'Retrait de $' .. amount .. ' de votre compte d\'épargne')
