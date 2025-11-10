@@ -75,4 +75,4 @@ Config.BlipScale = 0.8
 Config.NotificationDuration = 5000
 
 -- Debug mode
-Config.Debug = false
+Config.Debug = true

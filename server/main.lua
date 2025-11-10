@@ -1,73 +1,66 @@
 ESX = exports["es_extended"]:getSharedObject()
 
--- Détection de l'inventaire utilisé
-local UseJaksamInventory = GetResourceState('jaksam_inventory') == 'started'
-
--- Fonctions helper pour la compatibilité avec jaksam_inventory
+-- Fonctions helper sécurisées pour obtenir/modifier l'argent
 local function GetPlayerMoney(xPlayer)
-    if UseJaksamInventory then
-        return exports['jaksam_inventory']:GetMoney(xPlayer.source, 'money') or 0
-    else
+    local success, result = pcall(function()
         return xPlayer.getMoney()
+    end)
+    if success then
+        return result or 0
     end
+    return 0
 end
 
 local function GetPlayerBank(xPlayer)
-    if UseJaksamInventory then
-        return exports['jaksam_inventory']:GetMoney(xPlayer.source, 'bank') or 0
-    else
-        return xPlayer.getAccount('bank').money
+    local success, result = pcall(function()
+        local account = xPlayer.getAccount('bank')
+        return account and account.money or 0
+    end)
+    if success then
+        return result or 0
     end
+    return 0
 end
 
 local function AddPlayerMoney(xPlayer, amount)
-    if UseJaksamInventory then
-        exports['jaksam_inventory']:AddMoney(xPlayer.source, 'money', amount)
-    else
+    pcall(function()
         xPlayer.addMoney(amount)
-    end
+    end)
 end
 
 local function RemovePlayerMoney(xPlayer, amount)
-    if UseJaksamInventory then
-        exports['jaksam_inventory']:RemoveMoney(xPlayer.source, 'money', amount)
-    else
+    pcall(function()
         xPlayer.removeMoney(amount)
-    end
+    end)
 end
 
 local function AddPlayerBank(xPlayer, amount)
-    if UseJaksamInventory then
-        exports['jaksam_inventory']:AddMoney(xPlayer.source, 'bank', amount)
-    else
+    pcall(function()
         xPlayer.addAccountMoney('bank', amount)
-    end
+    end)
 end
 
 local function RemovePlayerBank(xPlayer, amount)
-    if UseJaksamInventory then
-        exports['jaksam_inventory']:RemoveMoney(xPlayer.source, 'bank', amount)
-    else
+    pcall(function()
         xPlayer.removeAccountMoney('bank', amount)
-    end
+    end)
 end
 
-if UseJaksamInventory then
-    print('^2[BasseBank] ^7Détection: jaksam_inventory utilisé')
-else
-    print('^2[BasseBank] ^7Détection: ESX standard utilisé')
-end
+print('^2[BasseBank] ^7Système de gestion d\'argent initialisé')
 
 -- Callback pour obtenir les soldes
 ESX.RegisterServerCallback('bassebank:getBalances', function(source, cb)
     local xPlayer = ESX.GetPlayerFromId(source)
     if not xPlayer then
+        print('^1[BasseBank] ^7Erreur: xPlayer non trouvé pour source ' .. source)
         cb({cash = 0, bank = 0})
         return
     end
 
     local cash = GetPlayerMoney(xPlayer)
     local bank = GetPlayerBank(xPlayer)
+
+    print('^3[BasseBank DEBUG] ^7Source: ' .. source .. ' | Cash: ' .. cash .. ' | Bank: ' .. bank)
 
     cb({cash = cash, bank = bank})
 end)
@@ -111,7 +104,10 @@ AddEventHandler('bassebank:deposit', function(amount)
     local _source = source
     local xPlayer = ESX.GetPlayerFromId(_source)
 
-    if not xPlayer then return end
+    if not xPlayer then
+        print('^1[BasseBank] ^7Dépôt: xPlayer non trouvé pour source ' .. _source)
+        return
+    end
 
     if amount <= 0 then
         TriggerClientEvent('bassebank:notify', _source, 'error', 'Montant invalide')
@@ -119,6 +115,7 @@ AddEventHandler('bassebank:deposit', function(amount)
     end
 
     local playerMoney = GetPlayerMoney(xPlayer)
+    print('^3[BasseBank DEBUG] ^7Dépôt: Joueur a ' .. playerMoney .. '$ cash, essaie de déposer ' .. amount .. '$')
 
     if amount > playerMoney then
         TriggerClientEvent('bassebank:notify', _source, 'error', 'Vous n\'avez pas assez d\'argent liquide')
@@ -130,6 +127,8 @@ AddEventHandler('bassebank:deposit', function(amount)
 
     RemovePlayerMoney(xPlayer, amount)
     AddPlayerBank(xPlayer, finalAmount)
+
+    print('^2[BasseBank] ^7Dépôt réussi: ' .. finalAmount .. '$ déposé')
 
     LogTransaction(xPlayer.identifier, 'depot', finalAmount, nil, nil, 'Dépôt en banque')
 
@@ -331,6 +330,32 @@ ESX.RegisterServerCallback('bassebank:getPlayers', function(source, cb)
 
     cb(players)
 end)
+
+-- Commande de debug pour voir les soldes
+RegisterCommand('bankdebug', function(source, args, rawCommand)
+    local xPlayer = ESX.GetPlayerFromId(source)
+    if not xPlayer then
+        print('^1[BasseBank] ^7Debug: xPlayer non trouvé')
+        return
+    end
+
+    local cash = GetPlayerMoney(xPlayer)
+    local bank = GetPlayerBank(xPlayer)
+
+    print('^6[BasseBank DEBUG] ^7======================')
+    print('^6[BasseBank DEBUG] ^7Source: ' .. source)
+    print('^6[BasseBank DEBUG] ^7Identifier: ' .. xPlayer.identifier)
+    print('^6[BasseBank DEBUG] ^7Nom: ' .. xPlayer.getName())
+    print('^6[BasseBank DEBUG] ^7Cash: ' .. cash .. '$')
+    print('^6[BasseBank DEBUG] ^7Bank: ' .. bank .. '$')
+    print('^6[BasseBank DEBUG] ^7======================')
+
+    TriggerClientEvent('chat:addMessage', source, {
+        color = {255, 255, 0},
+        multiline = true,
+        args = {"[BasseBank]", "Cash: $" .. cash .. " | Bank: $" .. bank}
+    })
+end, false)
 
 -- Debug
 if Config.Debug then
